@@ -1,0 +1,7 @@
+FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+ENV OPERATOR_NAME=ovsdpdk-network-operator
+COPY _output/ovsdpdk-network-operator /usr/bin/
+#COPY _output/ovsdpdk-network-prepare /usr/bin/
+#COPY bindata /bindata
+
+CMD ["/usr/bin/cluster-network-operator"]

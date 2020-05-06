@@ -15,8 +15,7 @@ spec:
       serviceAccountName: ovsdpdk-network-operator
       containers:
         - name: ovsdpdk-network-operator
-          # Replace this with the built image name
-          image: quay.io/krsacme/ovsdpdk-network-operator:v0.0.1
+          image: quay.io/krsacme/ovsdpdk-network-operator:latest
           command:
           - ovsdpdk-network-operator
           imagePullPolicy: Always

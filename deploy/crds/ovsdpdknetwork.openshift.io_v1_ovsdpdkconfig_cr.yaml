@@ -3,5 +3,13 @@ kind: OvsDpdkConfig
 metadata:
   name: example-ovsdpdkconfig
 spec:
-  # Add fields here
-  size: 3
+  nodeSelectorLabels:
+    network.operator.openshift.io/external-openvswitch: ""
+  nodeConfig:
+    pmdCount: 1
+  interfaceConfig:
+    - bridge: "br-dpdk0"
+      bond: false
+      nicSelector:
+        devices:
+          - 0000:06:00.0

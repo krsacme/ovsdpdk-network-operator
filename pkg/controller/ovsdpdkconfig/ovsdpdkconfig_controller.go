@@ -100,7 +100,7 @@ func (r *ReconcileOvsDpdkConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	reqLogger.Info("KRS: OvsDpdkConfig", instance)
+	reqLogger.Info("KRS", "OvsDpdkConfig", instance)
 	// Define a new Pod object
 	pod := newPodForCR(instance)
 

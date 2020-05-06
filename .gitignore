@@ -1,6 +1,9 @@
 # Temporary Build Files
 build/_output
+_output
 build/_test
+vendor
+deploy/crds
 # Created by https://www.gitignore.io/api/go,vim,emacs,visualstudiocode
 ### Emacs ###
 # -*- mode: gitignore; -*-
