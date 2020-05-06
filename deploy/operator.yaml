@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ovsdpdk-network-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: ovsdpdk-network-operator
+  template:
+    metadata:
+      labels:
+        name: ovsdpdk-network-operator
+    spec:
+      serviceAccountName: ovsdpdk-network-operator
+      containers:
+        - name: ovsdpdk-network-operator
+          # Replace this with the built image name
+          image: quay.io/krsacme/ovsdpdk-network-operator:v0.0.1
+          command:
+          - ovsdpdk-network-operator
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "ovsdpdk-network-operator"

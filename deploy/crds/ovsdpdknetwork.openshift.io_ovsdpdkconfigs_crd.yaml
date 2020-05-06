@@ -1,0 +1,104 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ovsdpdkconfigs.ovsdpdknetwork.openshift.io
+spec:
+  group: ovsdpdknetwork.openshift.io
+  names:
+    kind: OvsDpdkConfig
+    listKind: OvsDpdkConfigList
+    plural: ovsdpdkconfigs
+    singular: ovsdpdkconfig
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: OvsDpdkConfig is the Schema for the ovsdpdkconfigs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: OvsDpdkConfigSpec defines the desired state of OvsDpdkConfig
+            properties:
+              interfaceConfig:
+                description: Interfaces to be used for OvS-DPDK configuration
+                items:
+                  properties:
+                    bond:
+                      type: boolean
+                    bondMonde:
+                      type: string
+                    bridge:
+                      type: string
+                    driver:
+                      type: string
+                    mtu:
+                      format: int32
+                      type: integer
+                    nicSelector:
+                      properties:
+                        devices:
+                          items:
+                            type: string
+                          type: array
+                        ifNames:
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    queues:
+                      format: int32
+                      type: integer
+                  required:
+                  - bridge
+                  - nicSelector
+                  type: object
+                type: array
+              nodeConfig:
+                description: Node specific configuration
+                properties:
+                  hugepage1g:
+                    type: string
+                  memoryChannel:
+                    format: int32
+                    type: integer
+                  pmdCount:
+                    format: int32
+                    type: integer
+                type: object
+              nodeSelectorLabels:
+                additionalProperties:
+                  type: string
+                description: Nodes on which OvS-DPDK should run
+                type: object
+            required:
+            - interfaceConfig
+            - nodeSelectorLabels
+            type: object
+          status:
+            description: OvsDpdkConfigStatus defines the observed state of OvsDpdkConfig
+            properties:
+              nodes:
+                description: List of nodes on which OvS-DPDK is enabled (is it useful?)
+                items:
+                  type: string
+                type: array
+            required:
+            - nodes
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

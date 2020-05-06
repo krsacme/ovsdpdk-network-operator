@@ -1,0 +1,7 @@
+apiVersion: ovsdpdknetwork.openshift.io/v1
+kind: OvsDpdkConfig
+metadata:
+  name: example-ovsdpdkconfig
+spec:
+  # Add fields here
+  size: 3
