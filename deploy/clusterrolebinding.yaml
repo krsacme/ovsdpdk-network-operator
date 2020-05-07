@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ovsdpdk-network-operator
+roleRef:
+  kind: ClusterRole
+  name: ovsdpdk-network-operator
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: $NAMESPACE
+  name: ovsdpdk-network-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ovsdpdk-network-prepare
+roleRef:
+  kind: ClusterRole
+  name: ovsdpdk-network-prepare
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: $NAMESPACE
+  name: ovsdpdk-network-prepare
+

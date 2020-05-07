@@ -40,7 +40,7 @@ ovsdpdk-network-prepare:
 image:
 	hack/build-image.sh
 
-image-dev: build
+dev image-dev: build
 	DEV=true hack/build-image.sh
 
 check test:

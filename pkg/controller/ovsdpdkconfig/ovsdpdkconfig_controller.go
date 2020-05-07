@@ -1,14 +1,27 @@
 package ovsdpdkconfig
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"strings"
+	"text/template"
 
-	ovsdpdknetworkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdknetwork/v1"
+	ovsdpdkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdknetwork/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	kscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -17,14 +30,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/Masterminds/sprig"
 )
 
-var log = logf.Log.WithName("controller_ovsdpdkconfig")
+const (
+	OVSDPDK_NETWORK_PREPARE_DS = "./bindata/manifests/prepare/daemonset.yaml"
+	CONFIG_MAP_KEY_INTERFACE   = "interface"
+	CONFIG_MAP_KEY_NODE        = "node"
+)
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
+type RenderData struct {
+	Funcs template.FuncMap
+	Data  map[string]interface{}
+}
+
+func MakeRenderData() RenderData {
+	return RenderData{
+		Funcs: template.FuncMap{},
+		Data:  map[string]interface{}{},
+	}
+}
+
+var log = logf.Log.WithName("controller_ovsdpdkconfig")
 
 // Add creates a new OvsDpdkConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -46,17 +74,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource OvsDpdkConfig
-	err = c.Watch(&source.Kind{Type: &ovsdpdknetworkv1.OvsDpdkConfig{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &ovsdpdkv1.OvsDpdkConfig{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner OvsDpdkConfig
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	// Watch for changes to secondary resource DaemonSet and requeue the owner OvsDpdkConfig
+	/*err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &ovsdpdknetworkv1.OvsDpdkConfig{},
-	})
+		OwnerType:    &ovsdpdkv1.OvsDpdkConfig{},
+	})*/
 	if err != nil {
 		return err
 	}
@@ -77,8 +104,6 @@ type ReconcileOvsDpdkConfig struct {
 
 // Reconcile reads that state of the cluster for a OvsDpdkConfig object and makes changes based on the state read
 // and what is in the OvsDpdkConfig.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
@@ -87,7 +112,7 @@ func (r *ReconcileOvsDpdkConfig) Reconcile(request reconcile.Request) (reconcile
 	reqLogger.Info("Reconciling OvsDpdkConfig")
 
 	// Fetch the OvsDpdkConfig instance
-	instance := &ovsdpdknetworkv1.OvsDpdkConfig{}
+	instance := &ovsdpdkv1.OvsDpdkConfig{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -100,55 +125,255 @@ func (r *ReconcileOvsDpdkConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	reqLogger.Info("KRS", "OvsDpdkConfig", instance)
-	// Define a new Pod object
-	pod := newPodForCR(instance)
+	if len(instance.Spec.NodeSelectorLabels) == 0 {
+		err := fmt.Errorf("NodeSelectorLabels is mandatory to run OvS-DPDK")
+		reqLogger.Error(err, "NodeSelectorLabels is empty")
+		return reconcile.Result{}, err
+	}
+
+	mLabels := client.MatchingLabels(instance.Spec.NodeSelectorLabels)
+	reqLogger.Info("Get Node Selector labels", "Labels", mLabels)
+
+	// Fetch the Nodes
+	nodeList := &corev1.NodeList{}
+	err = r.client.List(context.TODO(), nodeList, mLabels)
+	if err != nil {
+		reqLogger.Error(err, "Failed to list nodes")
+		return reconcile.Result{}, err
+	}
+
+	for _, item := range nodeList.Items {
+		reqLogger.Info("List of selected nodes to run OvS-DPDK", "Node", item.Name)
+		// TODO: (skramaja) Find the existing DaemonSets of OvS-DPDK and see if there are any overlaps, error if overlapping labels are used
+	}
+
+	objKey := types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}
+
+	// Create a ConfigMap with the node and interface configs and use the ConfigMap object in the prepare command
+	cm, err := r.newConfigMapForCR(instance, objKey)
+	if err != nil {
+		reqLogger.Error(err, "Failed to create ConfigMap object")
+		return reconcile.Result{}, err
+	}
 
 	// Set OvsDpdkConfig instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, cm, r.scheme); err != nil {
+		reqLogger.Error(err, "Failed to set controller reference to ConfigMap")
 		return reconcile.Result{}, err
 	}
 
-	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
-		if err != nil {
+	// Create or Update the ConfigMap object
+	found := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), objKey, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Not found, create ConfigMap
+			reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+			err = r.client.Create(context.TODO(), cm)
+			if err != nil {
+				reqLogger.Error(err, "Failed to create ConfigMap")
+				return reconcile.Result{}, err
+			}
+		} else {
+			reqLogger.Error(err, "Failed to get ConfigMap object")
 			return reconcile.Result{}, err
 		}
+	} else {
+		// ConfigMap exists, update it
+		// TODO: (skramaja)
+		reqLogger.Info("ConfigMap exits, update ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+	}
 
-		// Pod created successfully - don't requeue
-		return reconcile.Result{}, nil
-	} else if err != nil {
+	// Define a new DaemeonSet object
+	err = r.syncDaemonSetForCR(instance, objKey)
+	if err != nil {
+		reqLogger.Error(err, "Failed to sync DaemonSet for OvSDPDK Prepare")
 		return reconcile.Result{}, err
 	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
+	reqLogger.Info("Reconcile successful")
 	return reconcile.Result{}, nil
 }
 
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *ovsdpdknetworkv1.OvsDpdkConfig) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
+func (r *ReconcileOvsDpdkConfig) newConfigMapForCR(cr *ovsdpdkv1.OvsDpdkConfig, objKey types.NamespacedName) (*corev1.ConfigMap, error) {
+	interfaceConfig, err := json.Marshal(cr.Spec.InterfaceConfig)
+	if err != nil {
+		log.Error(err, "Failed to Marshal InterfaceConfig")
+		return nil, err
 	}
-	return &corev1.Pod{
+
+	nodeConfig, err := json.Marshal(cr.Spec.NodeConfig)
+	if err != nil {
+		log.Error(err, "Failed to Marshal NodeConfig")
+		return nil, err
+	}
+
+	configData := make(map[string]string)
+	configData[CONFIG_MAP_KEY_INTERFACE] = string(interfaceConfig)
+	configData[CONFIG_MAP_KEY_NODE] = string(nodeConfig)
+	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
+			Name:      objKey.Name,
+			Namespace: objKey.Namespace,
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
+		Data: configData,
+	}, nil
+}
+
+func (r *ReconcileOvsDpdkConfig) getOpertaorImage(objKey types.NamespacedName) (string, error) {
+	// Fetch the operator Deployment
+	deployment := &appsv1.Deployment{}
+	objKey.Name = "ovsdpdk-network-operator"
+	err := r.client.Get(context.TODO(), objKey, deployment)
+	if err != nil {
+		log.Error(err, "Failed to get operator Deployment object")
+		return "", err
 	}
+
+	log.Info("KRS", "Image", deployment.Spec.Template.Spec.Containers[0].Image)
+	return deployment.Spec.Template.Spec.Containers[0].Image, nil
+}
+
+func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig, objKey types.NamespacedName) error {
+	image, err := r.getOpertaorImage(objKey)
+	if err != nil {
+		return err
+	}
+
+	data := MakeRenderData()
+	data.Data["Name"] = objKey.Name
+	data.Data["Namespace"] = objKey.Namespace
+	data.Data["Image"] = image
+	data.Data["NodeSelector"] = cr.Spec.NodeSelectorLabels
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASEVERSION")
+	data.Data["ResourcePrefix"] = os.Getenv("RESOURCE_PREFIX")
+
+	obj, err := r.renderDsForCR(OVSDPDK_NETWORK_PREPARE_DS, &data)
+	if err != nil {
+		log.Error(err, "Fail to render OvS-DPDK Prepare DaemonSet manifests")
+		return err
+	}
+
+	if obj.GetKind() != "DaemonSet" {
+		err = fmt.Errorf("Only DaemonSet Kind is expected")
+		log.Error(err, "Invalid Kind", "Kind", obj.GetKind())
+		return err
+	}
+
+	scheme := kscheme.Scheme
+	ds := &appsv1.DaemonSet{}
+	err = scheme.Convert(obj, ds, nil)
+	if err != nil {
+		log.Error(err, "Failed to convert to DaemonSet")
+		return err
+	}
+
+	ds.Spec.Template.Spec.NodeSelector = cr.Spec.NodeSelectorLabels
+
+	// Set OvsDpdkConfig instance as the owner and controller
+	if err := controllerutil.SetControllerReference(cr, ds, r.scheme); err != nil {
+		return err
+	}
+
+	// Check if this DaemonSet already exists
+	found := &appsv1.DaemonSet{}
+	err = r.client.Get(context.TODO(), objKey, found)
+	if err != nil && errors.IsNotFound(err) {
+		log.Info("Creating a new DaemonSet", "DaemonSet.Namespace", ds.Namespace, "DaemonSet.Name", ds.Name)
+		err = r.client.Create(context.TODO(), ds)
+		if err != nil {
+			log.Error(err, "Failed to Create DaemonSet object")
+			return err
+		}
+
+		// DaemonSet created successfully - don't requeue
+		return nil
+	} else if err != nil {
+		log.Error(err, "Failed get DaemonSet object")
+		return err
+	}
+
+	// TODO: (skramaja) update existing object - delete and create?
+	return nil
+}
+
+func (r *ReconcileOvsDpdkConfig) renderDsForCR(path string, d *RenderData) (*uns.Unstructured, error) {
+	tmpl := template.New(path).Option("missingkey=error")
+	if d.Funcs != nil {
+		tmpl.Funcs(d.Funcs)
+	}
+
+	// Add universal functions
+	tmpl.Funcs(template.FuncMap{"getOr": getOr, "isSet": isSet})
+	tmpl.Funcs(sprig.TxtFuncMap())
+
+	source, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Error(err, "Failed to read file", "Path", path)
+		return nil, err
+	}
+
+	if _, err := tmpl.Parse(string(source)); err != nil {
+		log.Error(err, "Failed to parse template")
+		return nil, err
+	}
+
+	rendered := bytes.Buffer{}
+	if err := tmpl.Execute(&rendered, d.Data); err != nil {
+		log.Error(err, "Failed to render template")
+		return nil, err
+	}
+
+	// special case - if the entire file is whitespace, skip
+	if len(strings.TrimSpace(rendered.String())) == 0 {
+		log.V(2).Info("No content available")
+		return nil, nil
+	}
+
+	log.Info("KRS", "Rendered", rendered.String())
+
+	obj := unstructured.Unstructured{}
+	decoder := yaml.NewYAMLOrJSONDecoder(&rendered, 4096)
+	for {
+		if err := decoder.Decode(&obj); err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Error(err, "Failed to Decode content")
+			return nil, err
+		}
+	}
+
+	return &obj, nil
+}
+
+// getOr returns the value of m[key] if it exists, fallback otherwise.
+// As a special case, it also returns fallback if the value of m[key] is
+// the empty string
+func getOr(m map[string]interface{}, key, fallback string) interface{} {
+	val, ok := m[key]
+	if !ok {
+		return fallback
+	}
+
+	s, ok := val.(string)
+	if ok && s == "" {
+		return fallback
+	}
+
+	return val
+}
+
+// isSet returns the value of m[key] if key exists, otherwise false
+// Different from getOr because it will return zero values.
+func isSet(m map[string]interface{}, key string) interface{} {
+	val, ok := m[key]
+	if !ok {
+		return false
+	}
+	return val
 }
