@@ -80,10 +80,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to secondary resource DaemonSet and requeue the owner OvsDpdkConfig
-	/*err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &ovsdpdkv1.OvsDpdkConfig{},
-	})*/
+	})
 	if err != nil {
 		return err
 	}
@@ -333,8 +333,6 @@ func (r *ReconcileOvsDpdkConfig) renderDsForCR(path string, d *RenderData) (*uns
 		log.V(2).Info("No content available")
 		return nil, nil
 	}
-
-	log.Info("KRS", "Rendered", rendered.String())
 
 	obj := unstructured.Unstructured{}
 	decoder := yaml.NewYAMLOrJSONDecoder(&rendered, 4096)
