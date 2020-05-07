@@ -31,7 +31,7 @@ spec:
         image: {{.Image}}
         command:
           - ovsdpdk-network-prepare
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         securityContext:
           privileged: true
         args:

@@ -29,7 +29,7 @@ operator-sdk:
 generate: operator-sdk
 	hack/update-codegen.sh
 
-build: ovsdpdk-network-operator
+build: ovsdpdk-network-operator ovsdpdk-network-prepare
 
 ovsdpdk-network-operator:
 	WHAT=ovsdpdk-network-operator hack/build-go.sh

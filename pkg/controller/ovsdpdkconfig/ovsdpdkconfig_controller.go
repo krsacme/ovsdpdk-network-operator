@@ -8,8 +8,11 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	ovsdpdkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdknetwork/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -88,6 +91,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to secondary resource DaemonSet and requeue the owner OvsDpdkConfig
+	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &ovsdpdkv1.OvsDpdkConfig{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -132,7 +144,7 @@ func (r *ReconcileOvsDpdkConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	mLabels := client.MatchingLabels(instance.Spec.NodeSelectorLabels)
-	reqLogger.Info("Get Node Selector labels", "Labels", mLabels)
+	log.Info("Get Node Selector labels", "Labels", mLabels)
 
 	// Fetch the Nodes
 	nodeList := &corev1.NodeList{}
@@ -144,7 +156,7 @@ func (r *ReconcileOvsDpdkConfig) Reconcile(request reconcile.Request) (reconcile
 
 	for _, item := range nodeList.Items {
 		reqLogger.Info("List of selected nodes to run OvS-DPDK", "Node", item.Name)
-		// TODO: (skramaja) Find the existing DaemonSets of OvS-DPDK and see if there are any overlaps, error if overlapping labels are used
+		// Node section does not have any use now, its only for log
 	}
 
 	objKey := types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}
@@ -163,29 +175,52 @@ func (r *ReconcileOvsDpdkConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	// Create or Update the ConfigMap object
+	configMapUpdated := false
 	found := &corev1.ConfigMap{}
 	err = r.client.Get(context.TODO(), objKey, found)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// Not found, create ConfigMap
-			reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
-			err = r.client.Create(context.TODO(), cm)
+	if err != nil && errors.IsNotFound(err) {
+		// Not found, create ConfigMap
+		log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+		err = r.client.Create(context.TODO(), cm)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create ConfigMap")
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get ConfigMap object")
+		return reconcile.Result{}, err
+	} else {
+		// ConfigMap exists, update it
+		var foundIface []ovsdpdkv1.InterfaceConfig
+		var foundNode ovsdpdkv1.NodeConfig
+
+		err = json.Unmarshal([]byte(string(found.Data[CONFIG_MAP_KEY_INTERFACE])), &foundIface)
+		if err != nil {
+			reqLogger.Error(err, "Failed to Unmarshall interface config")
+			return reconcile.Result{}, err
+		}
+
+		err = json.Unmarshal([]byte(string(found.Data[CONFIG_MAP_KEY_NODE])), &foundNode)
+		if err != nil {
+			reqLogger.Error(err, "Failed to Unmarshall node config")
+			return reconcile.Result{}, err
+		}
+
+		if !reflect.DeepEqual(foundIface, instance.Spec.InterfaceConfig) || !reflect.DeepEqual(foundNode, instance.Spec.NodeConfig) {
+			log.Info("ConfigMap exits, Config updated", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+			configMapUpdated = true
+			err = r.client.Update(context.TODO(), cm)
 			if err != nil {
-				reqLogger.Error(err, "Failed to create ConfigMap")
+				reqLogger.Error(err, "Failed to update ConfigMap")
 				return reconcile.Result{}, err
 			}
 		} else {
-			reqLogger.Error(err, "Failed to get ConfigMap object")
-			return reconcile.Result{}, err
+			log.Info("ConfigMap exits, Config is same")
 		}
-	} else {
-		// ConfigMap exists, update it
-		// TODO: (skramaja)
-		reqLogger.Info("ConfigMap exits, update ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
 	}
 
 	// Define a new DaemeonSet object
-	err = r.syncDaemonSetForCR(instance, objKey)
+	err = r.syncDaemonSetForCR(instance, objKey, configMapUpdated)
 	if err != nil {
 		reqLogger.Error(err, "Failed to sync DaemonSet for OvSDPDK Prepare")
 		return reconcile.Result{}, err
@@ -238,7 +273,7 @@ func (r *ReconcileOvsDpdkConfig) getOpertaorImage(objKey types.NamespacedName) (
 	return deployment.Spec.Template.Spec.Containers[0].Image, nil
 }
 
-func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig, objKey types.NamespacedName) error {
+func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig, objKey types.NamespacedName, configMapUpdated bool) error {
 	image, err := r.getOpertaorImage(objKey)
 	if err != nil {
 		return err
@@ -295,9 +330,16 @@ func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig,
 	} else if err != nil {
 		log.Error(err, "Failed get DaemonSet object")
 		return err
+	} else if configMapUpdated {
+		// DaemonSet is existing, if ConfigMap is updated, update DaemonSet too
+		ds.Spec.Template.Labels["dirty"] = strconv.FormatInt(time.Now().Unix(), 10)
+		err = r.client.Update(context.TODO(), ds)
+		if err != nil {
+			log.Error(err, "Failed to update DaemonSet object")
+			return err
+		}
 	}
 
-	// TODO: (skramaja) update existing object - delete and create?
 	return nil
 }
 
