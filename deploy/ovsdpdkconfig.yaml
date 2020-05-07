@@ -1,9 +1,9 @@
-apiVersion: ovsdpdknetwork.openshift.io/v1
+apiVersion: ovsdpdk.network.openshift.io/v1
 kind: OvsDpdkConfig
 metadata:
-  name: example-ovsdpdkconfig
+  name: ovsdpdk-group-1
 spec:
-  nodeSelectorLabels:
+  nodeSelector:
     network.operator.openshift.io/external-openvswitch: ""
   nodeConfig:
     pmdCount: 1
@@ -13,3 +13,4 @@ spec:
       nicSelector:
         devices:
           - 0000:06:00.0
+

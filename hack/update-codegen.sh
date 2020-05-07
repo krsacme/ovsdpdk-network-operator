@@ -20,20 +20,20 @@ fi
 
 $GEN deepcopy \
   github.com/krsacme/ovsdpdk-network-operator/pkg/generated github.com/krsacme/ovsdpdk-network-operator/pkg/apis \
-  "ovsdpdk:v1" \
+  "ovsdpdknetwork:v1" \
   --go-header-file "${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt"
 
 echo "Generating Operator Crds..."
 operator-sdk generate crds
 
 echo "Creating single deploy yaml file..."
-files="deploy/files/service_account.yaml deploy/files/role.yaml deploy/files/role_binding.yaml deploy/files/operator.yaml"
+files="service_account.yaml clusterrole.yaml clusterrole_binding.yaml role.yaml role_binding.yaml operator.yaml"
 target="deploy/allinone.yaml"
 >| deploy/allinone.yaml
 for file in $files
 do
-    cat $file >> $target
+    cat "deploy/files/$file" >> $target
     echo "---" >> $target
 done
-cat "deploy/crds/ovsdpdk.network.openshift.io_ovsdpdkconfigs_crd.yaml" >> $target
+cat "deploy/crds/ovsdpdknetwork.openshift.io_ovsdpdkconfigs_crd.yaml" >> $target
 
