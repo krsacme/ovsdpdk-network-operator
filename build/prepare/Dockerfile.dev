@@ -1,0 +1,8 @@
+FROM fedora:32
+
+RUN dnf install --best --refresh -y --setopt=tsflags=nodocs openvswitch && \
+    dnf clean all && rm -rf /var/cache/dnf/*
+
+COPY _output/ovsdpdk-network-prepare /usr/bin/
+
+CMD ["/usr/bin/ovsdpdk-network-prepare"]

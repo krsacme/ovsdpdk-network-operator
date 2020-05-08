@@ -269,8 +269,9 @@ func (r *ReconcileOvsDpdkConfig) getOpertaorImage(objKey types.NamespacedName) (
 		return "", err
 	}
 
-	log.Info("KRS", "Image", deployment.Spec.Template.Spec.Containers[0].Image)
-	return deployment.Spec.Template.Spec.Containers[0].Image, nil
+	image := deployment.Spec.Template.Spec.Containers[0].Image
+	newImage := strings.Replace(image, "ovsdpdk-network-operator", "ovsdpdk-network-prepare", 1)
+	return newImage, nil
 }
 
 func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig, objKey types.NamespacedName, configMapUpdated bool) error {

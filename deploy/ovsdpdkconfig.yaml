@@ -1,16 +1,17 @@
-apiVersion: ovsdpdk.network.openshift.io/v1
+apiVersion: ovsdpdknetwork.openshift.io/v1
 kind: OvsDpdkConfig
 metadata:
   name: ovsdpdk-group-1
 spec:
-  nodeSelector:
+  nodeSelectorLabels:
     network.operator.openshift.io/external-openvswitch: ""
   nodeConfig:
     pmdCount: 1
   interfaceConfig:
     - bridge: "br-dpdk0"
       bond: false
+      driver: igb_uio
       nicSelector:
         devices:
-          - 0000:06:00.0
+          - 0000:00:06.0
 

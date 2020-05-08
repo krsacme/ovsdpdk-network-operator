@@ -18,13 +18,13 @@ const (
 func PrepareOvsBridgeConfig(ifaceConfigs *[]ovsdpdkv1.InterfaceConfig) error {
 	for _, ifaceConfig := range *ifaceConfigs {
 		if len(ifaceConfig.NicSelector.Devices) == 0 && len(ifaceConfig.NicSelector.IfNames) == 0 {
-			err = fmt.Errorf("Devices or IfNames must be specified")
+			err := fmt.Errorf("Devices or IfNames must be specified")
 			glog.Errorf("PrepareOvsBridgeConfig: %v", err)
 			return err
 		}
 
 		if len(ifaceConfig.NicSelector.Devices) > 0 && len(ifaceConfig.NicSelector.IfNames) > 0 {
-			err = fmt.Errorf("Both Devices and IfNames cannot be specified")
+			err := fmt.Errorf("Both Devices and IfNames cannot be specified")
 			glog.Errorf("PrepareOvsBridgeConfig: %v", err)
 			return err
 		}
@@ -41,7 +41,7 @@ func PrepareOvsBridgeConfig(ifaceConfigs *[]ovsdpdkv1.InterfaceConfig) error {
 			return err
 		}
 
-		err := addBridge(ifaceConfig.Bridge)
+		err = addBridge(ifaceConfig.Bridge)
 		if err != nil {
 			return err
 		}
