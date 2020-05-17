@@ -72,5 +72,8 @@ func runStartCmd(cmd *cobra.Command, args []string) {
 
 	prepare.PrepareOvsDpdkConfig(kubeclient)
 
-	glog.V(0).Info("Shutting down...")
+	glog.V(0).Info("Completed succesfull...")
+
+	for {
+	}
 }

@@ -98,7 +98,8 @@ func Run(name string, arg ...string) error {
 
 func getSocketMemory(mtu int, pciAddressList []string) (string, error) {
 	// TODO: (skramaja) Implement socket memory algorithm
-	return "1024,1024", nil
+	//return "1024,1024", nil
+	return "1024", nil
 }
 
 func GetLcores() ([]int, error) {

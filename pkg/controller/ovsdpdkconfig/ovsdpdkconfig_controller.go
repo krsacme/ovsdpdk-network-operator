@@ -274,8 +274,28 @@ func (r *ReconcileOvsDpdkConfig) getOpertaorImage(objKey types.NamespacedName) (
 	return newImage, nil
 }
 
+func (r *ReconcileOvsDpdkConfig) getCniImage(objKey types.NamespacedName) (string, error) {
+	// Fetch the operator Deployment
+	deployment := &appsv1.Deployment{}
+	objKey.Name = "ovsdpdk-network-operator"
+	err := r.client.Get(context.TODO(), objKey, deployment)
+	if err != nil {
+		log.Error(err, "Failed to get operator Deployment object")
+		return "", err
+	}
+
+	image := deployment.Spec.Template.Spec.Containers[0].Image
+	newImage := strings.Replace(image, "ovsdpdk-network-operator", "userspace-cni", 1)
+	return newImage, nil
+}
+
 func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig, objKey types.NamespacedName, configMapUpdated bool) error {
-	image, err := r.getOpertaorImage(objKey)
+	imagePrepare, err := r.getOpertaorImage(objKey)
+	if err != nil {
+		return err
+	}
+
+	imageCni, err := r.getCniImage(objKey)
 	if err != nil {
 		return err
 	}
@@ -283,10 +303,12 @@ func (r *ReconcileOvsDpdkConfig) syncDaemonSetForCR(cr *ovsdpdkv1.OvsDpdkConfig,
 	data := MakeRenderData()
 	data.Data["Name"] = objKey.Name
 	data.Data["Namespace"] = objKey.Namespace
-	data.Data["Image"] = image
+	data.Data["Image"] = imagePrepare
 	data.Data["NodeSelector"] = cr.Spec.NodeSelectorLabels
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASEVERSION")
 	data.Data["ResourcePrefix"] = os.Getenv("RESOURCE_PREFIX")
+
+	data.Data["ImageInit"] = imageCni
 
 	obj, err := r.renderDsForCR(OVSDPDK_NETWORK_PREPARE_DS, &data)
 	if err != nil {

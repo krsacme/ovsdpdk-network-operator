@@ -26,6 +26,12 @@ spec:
       tolerations:
       - operator: Exists
       serviceAccountName: ovsdpdk-network-operator
+      initContainers:
+      - name: {{.Name}}-init
+        image: {{.ImageInit}}
+        volumeMounts:
+        - name: cni-bin
+          mountPath: /cni
       containers:
       - name: {{.Name}}
         image: {{.Image}}
@@ -60,3 +66,6 @@ spec:
       - name: ovsrun
         hostPath:
           path: /var/run/openvswitch
+      - name: cni-bin
+        hostPath:
+          path: /opt/cni/bin/
