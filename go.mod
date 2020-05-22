@@ -7,6 +7,8 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/onsi/ginkgo v1.12.2
+	github.com/onsi/gomega v1.10.1
 	github.com/operator-framework/operator-sdk v0.17.1-0.20200506011514-f3240e9a326b
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v1.0.0

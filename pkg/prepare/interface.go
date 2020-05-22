@@ -15,8 +15,8 @@ const (
 	SYS_CLASS_NET = SYS + "class/net/"
 )
 
-func PrepareOvsBridgeConfig(ifaceConfigs *[]ovsdpdkv1.InterfaceConfig) error {
-	for _, ifaceConfig := range *ifaceConfigs {
+func PrepareOvsBridgeConfig(ifaceConfigs []ovsdpdkv1.InterfaceConfig) error {
+	for _, ifaceConfig := range ifaceConfigs {
 		if len(ifaceConfig.NicSelector.Devices) == 0 && len(ifaceConfig.NicSelector.IfNames) == 0 {
 			err := fmt.Errorf("Devices or IfNames must be specified")
 			glog.Errorf("PrepareOvsBridgeConfig: %v", err)

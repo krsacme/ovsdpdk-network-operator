@@ -5,35 +5,35 @@ import (
 	. "github.com/onsi/gomega"
 	iowrap "github.com/spf13/afero"
 
-	ovsdpdkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdk/v1"
+	ovsdpdkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdknetwork/v1"
 	. "github.com/krsacme/ovsdpdk-network-operator/pkg/prepare"
 )
 
 const (
-	NODE_FILE = "/sys/devices/system/node/online"
+	NODE_FILE = "/host/sys/devices/system/node/online"
 
-	NODE0 = "/sys/devices/system/node/node0/cpulist"
-	NODE1 = "/sys/devices/system/node/node1/cpulist"
-	NODE2 = "/sys/devices/system/node/node2/cpulist"
-	NODE3 = "/sys/devices/system/node/node3/cpulist"
+	NODE0 = "/host/sys/devices/system/node/node0/cpulist"
+	NODE1 = "/host/sys/devices/system/node/node1/cpulist"
+	NODE2 = "/host/sys/devices/system/node/node2/cpulist"
+	NODE3 = "/host/sys/devices/system/node/node3/cpulist"
 
 	PCI0 = SYS_BUS_PCI_DEVICES + "0000:01:00.0/numa_node"
 	PCI1 = SYS_BUS_PCI_DEVICES + "0000:02:00.0/numa_node"
 	PCI2 = SYS_BUS_PCI_DEVICES + "0000:03:00.0/numa_node"
 	PCI3 = SYS_BUS_PCI_DEVICES + "0000:04:00.0/numa_node"
 
-	CPU0  = "/sys/devices/system/cpu/cpu0/topology/thread_siblings"
-	CPU1  = "/sys/devices/system/cpu/cpu1/topology/thread_siblings"
-	CPU2  = "/sys/devices/system/cpu/cpu2/topology/thread_siblings"
-	CPU3  = "/sys/devices/system/cpu/cpu3/topology/thread_siblings"
-	CPU4  = "/sys/devices/system/cpu/cpu4/topology/thread_siblings"
-	CPU5  = "/sys/devices/system/cpu/cpu5/topology/thread_siblings"
-	CPU6  = "/sys/devices/system/cpu/cpu6/topology/thread_siblings"
-	CPU7  = "/sys/devices/system/cpu/cpu7/topology/thread_siblings"
-	CPU8  = "/sys/devices/system/cpu/cpu8/topology/thread_siblings"
-	CPU9  = "/sys/devices/system/cpu/cpu9/topology/thread_siblings"
-	CPU10 = "/sys/devices/system/cpu/cpu10/topology/thread_siblings"
-	CPU11 = "/sys/devices/system/cpu/cpu11/topology/thread_siblings"
+	CPU0  = "/host/sys/devices/system/cpu/cpu0/topology/thread_siblings"
+	CPU1  = "/host/sys/devices/system/cpu/cpu1/topology/thread_siblings"
+	CPU2  = "/host/sys/devices/system/cpu/cpu2/topology/thread_siblings"
+	CPU3  = "/host/sys/devices/system/cpu/cpu3/topology/thread_siblings"
+	CPU4  = "/host/sys/devices/system/cpu/cpu4/topology/thread_siblings"
+	CPU5  = "/host/sys/devices/system/cpu/cpu5/topology/thread_siblings"
+	CPU6  = "/host/sys/devices/system/cpu/cpu6/topology/thread_siblings"
+	CPU7  = "/host/sys/devices/system/cpu/cpu7/topology/thread_siblings"
+	CPU8  = "/host/sys/devices/system/cpu/cpu8/topology/thread_siblings"
+	CPU9  = "/host/sys/devices/system/cpu/cpu9/topology/thread_siblings"
+	CPU10 = "/host/sys/devices/system/cpu/cpu10/topology/thread_siblings"
+	CPU11 = "/host/sys/devices/system/cpu/cpu11/topology/thread_siblings"
 )
 
 func init() {
@@ -98,7 +98,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 1,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5}))
 			})
@@ -106,7 +106,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 2,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5}))
 			})
@@ -114,7 +114,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 4,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 2, 6}))
 			})
@@ -122,7 +122,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 6,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 2, 6, 3, 7}))
 			})
@@ -150,7 +150,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 1,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 9, 13}))
 			})
@@ -158,7 +158,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 2,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 9, 13}))
 			})
@@ -166,7 +166,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 4,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 2, 6, 9, 13}))
 			})
@@ -194,7 +194,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 1,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:02:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:02:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{9, 13, 1, 5}))
 			})
@@ -202,7 +202,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 2,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:02:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:02:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{9, 13, 1, 5}))
 			})
@@ -210,7 +210,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 4,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:02:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:02:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{9, 13, 10, 14, 1, 5}))
 			})
@@ -233,7 +233,7 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 1,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0", "0000:02:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0", "0000:02:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 9, 13}))
 			})
@@ -241,9 +241,89 @@ var _ = Describe("Pkg/Prepare/Ovsdpdk", func() {
 				nodeConfig := ovsdpdkv1.NodeConfig{
 					PMDCount: 4,
 				}
-				pmdCpus, err := GetPmdCpus(nodeConfig, []string{"0000:01:00.0", "0000:02:00.0"})
+				pmdCpus, err := GetPmdCpus(&nodeConfig, []string{"0000:01:00.0", "0000:02:00.0"})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pmdCpus).To(Equal([]int{1, 5, 2, 6, 9, 13, 10, 14}))
+			})
+		})
+	})
+	Describe("Get socket memory", func() {
+		var iface1, iface2 ovsdpdkv1.InterfaceConfig
+
+		BeforeEach(func() {
+			iface1 = ovsdpdkv1.InterfaceConfig{
+				NicSelector: ovsdpdkv1.NicSelector{
+					Devices: []string{"0000:01:00.0"},
+				},
+			}
+			iface2 = ovsdpdkv1.InterfaceConfig{
+				NicSelector: ovsdpdkv1.NicSelector{
+					Devices: []string{"0000:02:00.0"},
+				},
+			}
+		})
+		Context("Single NUMA", func() {
+			BeforeEach(func() {
+				iowrap.WriteFile(FS, NODE_FILE, []byte("0\n"), 0644)
+				iowrap.WriteFile(FS, NODE0, []byte("0-7\n"), 0644)
+
+			})
+			It("should get memory for no MTU value", func() {
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("2048"))
+			})
+			It("should get memory for 1500 MTU value", func() {
+				iface1.MTU = 1500
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("2048"))
+			})
+			It("should get memory for 2000 MTU value", func() {
+				iface1.MTU = 2000
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("2048"))
+			})
+			It("should get memory for 9000 MTU value", func() {
+				iface1.MTU = 9000
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("3072"))
+			})
+		})
+		Context("Dual NUMA with nics on both", func() {
+			BeforeEach(func() {
+				iowrap.WriteFile(FS, NODE_FILE, []byte("0,1\n"), 0644)
+
+			})
+			It("should get memory for no MTU value", func() {
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1, iface2})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("2048,2048"))
+			})
+			It("should get memory for 1500 MTU value", func() {
+				iface1.MTU = 1500
+				iface2.MTU = 1500
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1, iface2})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("2048,2048"))
+			})
+		})
+		Context("Dual NUMA with nics on one", func() {
+			BeforeEach(func() {
+				iowrap.WriteFile(FS, NODE_FILE, []byte("0,1\n"), 0644)
+
+			})
+			It("should get memory for no MTU value with nic in NUMA 0", func() {
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface1})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("2048,1024"))
+			})
+			It("should get memory for no MTU value with nic in NUMA 1", func() {
+				socMem, err := GetSocketMemory([]ovsdpdkv1.InterfaceConfig{iface2})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(socMem).To(Equal("1024,2048"))
 			})
 		})
 	})

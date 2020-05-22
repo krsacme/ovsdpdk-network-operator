@@ -2,10 +2,9 @@ package prepare_test
 
 import (
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	//. "github.com/onsi/gomega"
 	iowrap "github.com/spf13/afero"
-
-	ovsdpdkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdk/v1"
+	//ovsdpdkv1 "github.com/krsacme/ovsdpdk-network-operator/pkg/apis/ovsdpdknetwork/v1"
 	. "github.com/krsacme/ovsdpdk-network-operator/pkg/prepare"
 )
 

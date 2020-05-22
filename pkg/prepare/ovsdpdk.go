@@ -18,9 +18,9 @@ const (
 	SYS_DEVICES_SYSTEM = SYS + "devices/system/"
 )
 
-func PrepareOvSDPDKConfig(nodeConfig *ovsdpdkv1.NodeConfig, ifaceConfig *[]ovsdpdkv1.InterfaceConfig) error {
+func PrepareOvSDPDKConfig(nodeConfig *ovsdpdkv1.NodeConfig, ifaceConfig []ovsdpdkv1.InterfaceConfig) error {
 	var pciAddressList []string
-	for _, cfg := range *ifaceConfig {
+	for _, cfg := range ifaceConfig {
 		pci, err := GetPciAddressList(cfg.NicSelector)
 		if err != nil {
 			glog.Errorf("PrepareOvSDPDKConfig: Failed to get PCI address list: %v", err)
@@ -51,8 +51,7 @@ func PrepareOvSDPDKConfig(nodeConfig *ovsdpdkv1.NodeConfig, ifaceConfig *[]ovsdp
 	}
 
 	// Socket Memory
-	// TODO: (skramaja) Fix MTU value from config
-	sockMem, err := getSocketMemory(9000, pciAddressList)
+	sockMem, err := GetSocketMemory(ifaceConfig)
 	err = Run("ovs-vsctl", "set", "Open_vSwitch", ".", "other_config:dpdk-socket-mem="+sockMem)
 	if err != nil {
 		return err
@@ -94,12 +93,6 @@ func Run(name string, arg ...string) error {
 		glog.Infof("Run: stdout: %s", outStr)
 	}
 	return nil
-}
-
-func getSocketMemory(mtu int, pciAddressList []string) (string, error) {
-	// TODO: (skramaja) Implement socket memory algorithm
-	//return "1024,1024", nil
-	return "1024", nil
 }
 
 func GetLcores() ([]int, error) {
@@ -195,6 +188,79 @@ func GetPmdCpus(nodeConfig *ovsdpdkv1.NodeConfig, pciAddressList []string) ([]in
 	return pmd, nil
 }
 
+func GetSocketMemory(ifaceConfigs []ovsdpdkv1.InterfaceConfig) (string, error) {
+	numaNodes, err := getAllNumaNodes()
+	if err != nil {
+		glog.Errorf("GetLcores: Failed to get all NUMA nodes: %v", err)
+		return "", err
+	}
+
+	var sockMem []string
+
+	for _, node := range numaNodes {
+		mtu, err := getMaxMtu(node, ifaceConfigs)
+		if err != nil {
+			return "", err
+		}
+		var mem int = 1024
+		if mtu > 0 {
+			mem = calculateSocketMemory(mtu)
+		}
+		sockMem = append(sockMem, strconv.Itoa(mem))
+	}
+
+	return strings.Join(sockMem, ","), nil
+}
+
+func round1024(val int) int {
+	div := int(val / 1024)
+	if val%1024 > 0 {
+		div++
+	}
+	return div * 1024
+}
+
+func calculateSocketMemory(mtu int) int {
+	rounded := round1024(mtu) + 800
+	mempoolSize := 4096 * 64
+	mem := rounded * mempoolSize
+	buffer := 512 * 1024 * 1024
+	mem += buffer
+	memMB := mem / (1024 * 1024)
+	return round1024(memMB)
+}
+
+func getMaxMtu(node int, ifaceConfigs []ovsdpdkv1.InterfaceConfig) (int, error) {
+	mtu := -1
+
+	for _, cfg := range ifaceConfigs {
+		pci, err := GetPciAddressList(cfg.NicSelector)
+		if err != nil {
+			glog.Errorf("getMaxMtu: Failed to get PCI address list: %v", err)
+			return -1, err
+		}
+		ifaceNuma, err := getInterfaceNumaNodes(pci)
+		if err != nil {
+			glog.Errorf("getMaxMtu: Failed to NUMA nodes of pci: %v", err)
+			return -1, err
+		}
+		if len(ifaceNuma) != 1 {
+			err = fmt.Errorf("Invalid Numa nodes (%v) for pci (%v)", ifaceNuma, pci)
+			glog.Errorf("getMaxMtu: Failed to get Numa nodes: %v", err)
+			return -1, err
+		}
+		if ifaceNuma[0] != node {
+			continue
+		}
+		mtu = 1500
+		if mtu >= int(cfg.MTU) {
+			continue
+		}
+		mtu = int(cfg.MTU)
+	}
+	return mtu, nil
+}
+
 func getNumaCpus(numa int) ([]int, error) {
 	cpulistPath := fmt.Sprintf(SYS_DEVICES_SYSTEM+"node/node%d/cpulist", numa)
 	cpulist, err := getIntContent(cpulistPath)
@@ -245,17 +311,30 @@ func getIntContent(filePath string) ([]int, error) {
 	return cpus, nil
 }
 
+func getInterfaceNumaNode(pciAddress string) (int, error) {
+	pciNumaPath := path.Join(SYS_BUS_PCI_DEVICES, pciAddress, "numa_node")
+	content, err := FSUtil.ReadFile(pciNumaPath)
+	if err != nil {
+		glog.Errorf("getNumaNodes: Failed to read file %s: %v", pciNumaPath, err)
+		return -1, err
+	}
+	contentStr := strings.TrimSuffix(string(content), "\n")
+	numa, err := strconv.Atoi(contentStr)
+	if err != nil {
+		glog.Errorf("getInterfaceNumaNode: Failed to parse (%s): %v", contentStr, err)
+		return -1, err
+	}
+	return numa, nil
+
+}
+
 func getInterfaceNumaNodes(pciAddressList []string) ([]int, error) {
 	var numaNodes []int
 	for _, pciAddress := range pciAddressList {
-		pciNumaPath := path.Join(SYS_BUS_PCI_DEVICES, pciAddress, "numa_node")
-		content, err := FSUtil.ReadFile(pciNumaPath)
+		numa, err := getInterfaceNumaNode(pciAddress)
 		if err != nil {
-			glog.Errorf("getNumaNodes: Failed to read file %s: %v", pciNumaPath, err)
 			return nil, err
 		}
-		contentStr := strings.TrimSuffix(string(content), "\n")
-		numa, _ := strconv.Atoi(contentStr)
 		if numa >= 0 {
 			numaNodes = append(numaNodes, int(numa))
 		}
