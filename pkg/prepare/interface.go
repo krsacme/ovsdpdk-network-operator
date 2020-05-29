@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
+	"strings"
 
 	"github.com/golang/glog"
 
@@ -92,6 +94,7 @@ func bindDriver(driver string, pciAddressList []string) error {
 }
 
 func getInterfacePciAddress(ifaceName string) (string, error) {
+	// Case1: physical devices => /sys/class/net/em4/device -> ../../../0000:07:00.1
 	devPath := path.Join(SYS_CLASS_NET, ifaceName, "device")
 	_, err := os.Lstat(devPath)
 	if err != nil {
@@ -105,8 +108,37 @@ func getInterfacePciAddress(ifaceName string) (string, error) {
 		return "", err
 	}
 
-	_, f := path.Split(devLink)
-	return f, nil
+	_, pci := path.Split(devLink)
+	pciRegexp := `[\da-fA-F]{4}:[\da-fA-F]{2}:[\da-fA-F]{2}.[0-7]`
+	matched, err := regexp.Match(pciRegexp, []byte(pci))
+	if err == nil && matched {
+		// Case1: Found PCI address
+		glog.Infof("getInterfacePciAddress: PCI address (%s) found for physical interface (%s)", pci, ifaceName)
+		return pci, nil
+	}
+
+	// Case: virtio devices => /sys/class/net/eth1/device -> ../../../virtio2
+	ifaceLink, err := os.Readlink(path.Join(SYS_CLASS_NET, ifaceName))
+	if err != nil {
+		glog.Errorf("getInterfacePciAddress: Failed: %v", err)
+		return "", nil
+	}
+
+	splitPath := strings.Split(ifaceLink, pci)
+	if len(splitPath) == 0 {
+		err = fmt.Errorf("Interface link (%s) does not have pci mactch (%s)", ifaceLink, pci)
+		glog.Errorf("getInterfacePciAddress: Failed: %v", err)
+		return "", err
+	}
+
+	_, virtPci := path.Split(strings.TrimSuffix(splitPath[0], "/"))
+	matched, err = regexp.Match(pciRegexp, []byte(virtPci))
+	if err != nil || !matched {
+		err = fmt.Errorf("Pattern (%s) is not a valid PCI address for virtual devices", virtPci)
+		glog.Errorf("getInterfacePciAddress: Failed: %v", err)
+		return "", err
+	}
+	return virtPci, nil
 }
 
 func addBridge(bridgeName string) error {

@@ -156,11 +156,6 @@ func GetPmdCpus(nodeConfig *ovsdpdkv1.NodeConfig, pciAddressList []string) ([]in
 		return nil, err
 	}
 
-	if len(ifaceNumaNodes) == 0 {
-		// List will be empty when there is only one numa node
-		ifaceNumaNodes = append(ifaceNumaNodes, 0)
-	}
-
 	var pmd []int
 	for _, numa := range ifaceNumaNodes {
 		cpus, err := getNumaPmdCpus(numa, int(nodeConfig.PMDCount))
@@ -239,11 +234,13 @@ func getMaxMtu(node int, ifaceConfigs []ovsdpdkv1.InterfaceConfig) (int, error) 
 			glog.Errorf("getMaxMtu: Failed to get PCI address list: %v", err)
 			return -1, err
 		}
+
 		ifaceNuma, err := getInterfaceNumaNodes(pci)
 		if err != nil {
 			glog.Errorf("getMaxMtu: Failed to NUMA nodes of pci: %v", err)
 			return -1, err
 		}
+
 		if len(ifaceNuma) != 1 {
 			err = fmt.Errorf("Invalid Numa nodes (%v) for pci (%v)", ifaceNuma, pci)
 			glog.Errorf("getMaxMtu: Failed to get Numa nodes: %v", err)
@@ -330,6 +327,7 @@ func getInterfaceNumaNode(pciAddress string) (int, error) {
 
 func getInterfaceNumaNodes(pciAddressList []string) ([]int, error) {
 	var numaNodes []int
+	var invalidNuma = false
 	for _, pciAddress := range pciAddressList {
 		numa, err := getInterfaceNumaNode(pciAddress)
 		if err != nil {
@@ -337,8 +335,16 @@ func getInterfaceNumaNodes(pciAddressList []string) ([]int, error) {
 		}
 		if numa >= 0 {
 			numaNodes = append(numaNodes, int(numa))
+		} else if numa == -1 {
+			invalidNuma = true
 		}
 	}
+	// If NUMA is not associated with interface, then return NUMA0
+	if len(numaNodes) == 0 && invalidNuma {
+		glog.Infof("getInterfaceNumaNodes: NUMA is not associated with PCI addres (%v)", pciAddressList)
+		numaNodes = append(numaNodes, 0)
+	}
+
 	return numaNodes, nil
 }
 

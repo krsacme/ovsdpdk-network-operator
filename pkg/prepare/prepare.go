@@ -49,7 +49,7 @@ func PrepareOvsDpdkConfig(kc *kubernetes.Clientset) error {
 	ifaceJson := cm.Data["interface"]
 	glog.Infof("Interface JSON: %s", ifaceJson)
 	ifaceConfig := []ovsdpdkv1.InterfaceConfig{}
-	err = json.Unmarshal([]byte(ifaceJson), ifaceConfig)
+	err = json.Unmarshal([]byte(ifaceJson), &ifaceConfig)
 	if err != nil {
 		glog.Errorf("Failed to unmarshal interface config: %v", err)
 		return err
