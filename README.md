@@ -6,7 +6,7 @@ Two images are built `ovsdpdk-network-operator` and `operator-network-prepare`
 in this operator, which below command.
 
 ```
-export DOCKER_PREFIX="quay.io/krsacme"; export DOCKER_TAG="latest"; make dev
+make dev
 ```
 
 # Generate

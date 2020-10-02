@@ -1,3 +1,7 @@
+VERSION ?= 0.0.1
+REGISTRY ?= quay.io
+ORG ?= krsacme
+
 # Copied from coreos-assembler
 GOARCH := $(shell uname -m)
 ifeq ($(GOARCH),x86_64)
@@ -38,10 +42,10 @@ ovsdpdk-network-prepare:
 	WHAT=ovsdpdk-network-prepare hack/build-go.sh
 
 image:
-	hack/build-image.sh
+	REGISTRY=${REGISTRY} ORG=${ORG} VERSION=${VERSION} hack/build-image.sh
 
 dev image-dev: build
-	DEV=true hack/build-image.sh
+	DEV=true REGISTRY=${REGISTRY} ORG=${ORG} VERSION=${VERSION} hack/build-image.sh
 
 check test:
 	hack/test-go.sh ${PKGS}

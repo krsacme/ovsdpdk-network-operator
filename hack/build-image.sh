@@ -2,8 +2,6 @@
 
 set -eu
 
-DOCKER_PREFIX=${DOCKER_PREFIX:-quay.io/krsacme}
-DOCKER_TAG=${DOCKER_TAG:=latest}
 CONTAINER_CLI=podman
 
 DEV=${DEV:-false}
@@ -31,7 +29,7 @@ if [[ $CLEAR == 1 ]]; then
     set +e
     NAME="ovsdpdk-network-operator"
     rm _output/ovsdpdk-network-operator.md5
-    $CONTAINER_CLI rmi -f ${DOCKER_PREFIX}/${NAME}:${DOCKER_TAG}
+    $CONTAINER_CLI rmi -f ${REGISTRY}/${ORG}/${NAME}:${VERSION}
     set -e
 fi
 
@@ -56,14 +54,14 @@ for i in $IMAGES; do
     echo $NEW > $MD5
 
     echo "Building container image $NAME ..."
-    $CONTAINER_CLI build -f build/$i/${DOCKERFILE} . -t ${DOCKER_PREFIX}/${NAME}:${DOCKER_TAG}
+    $CONTAINER_CLI build -f build/$i/${DOCKERFILE} . -t ${REGISTRY}/${ORG}/${NAME}:${VERSION}
     if [[ $DEV == "true" ]]; then
-        $CONTAINER_CLI push ${DOCKER_PREFIX}/${NAME}:${DOCKER_TAG}
+        $CONTAINER_CLI push ${REGISTRY}/${ORG}/${NAME}:${VERSION}
     fi
 done
 
 NAME=userspace-cni
-$CONTAINER_CLI build -f build/userspace-cni/Dockerfile . -t ${DOCKER_PREFIX}/${NAME}:${DOCKER_TAG}
+$CONTAINER_CLI build -f build/userspace-cni/Dockerfile . -t ${REGISTRY}/${ORG}/${NAME}:${VERSION}
 if [[ $DEV == "true" ]]; then
-    $CONTAINER_CLI push ${DOCKER_PREFIX}/${NAME}:${DOCKER_TAG}
+    $CONTAINER_CLI push ${REGISTRY}/${ORG}/${NAME}:${VERSION}
 fi
